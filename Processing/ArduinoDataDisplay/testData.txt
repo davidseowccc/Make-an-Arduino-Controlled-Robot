@@ -1,0 +1,14 @@
+// test data for Processing sketch
+Label,1,left line,
+Label,2,Sensitivity,
+Label,10,label 10,
+Range,1,-127,127,
+Range,2,-100,100,
+Range,3,-100,100,
+Data,1,-126,
+Data,2,25,
+Data,3,-25,
+Data,9,200,
+Data,10,1000,
+
+

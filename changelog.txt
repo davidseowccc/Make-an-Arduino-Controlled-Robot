@@ -1,0 +1,6 @@
+changelog.txt  created: 22 Nov 2012 
+
+This file identifies code in the download that has changed from the printed text
+
+22 Nov 2011:
+libraries/AFmotor/AFMotor.h updated to eliminate Leonardo compile error messages with Arduino 1.0.2

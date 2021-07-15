@@ -1,0 +1,169 @@
+/*
+ * ArduinoDataDisplay
+ * based on ShowSensorData.pde written for Recipe 4.4 
+ * 
+ * Displays bar graphs of CSV sensor data
+ * in all cases, N is the Row to be associated with the given message
+ * Labels sent as: "Label,N,the label\n"  // "the label" is used for Row N
+ * Range sent as : "Range,N,Min, Max\n"  // Row N has a range from min to max
+ *    if Min is negative then the bar grows from the midpoint of Min and Max, else the bar grows from Min
+ * Data sent as:  "Data,N,val\n"   // val is plotted for row N
+ */
+
+import processing.serial.*;
+
+Serial myPort;  // Create object from Serial class
+String message = null;
+PFont fontA;    // font to display servo pin number 
+int fontSize = 12;
+
+int maxNumberOfRows = 10;
+
+int rectMargin = 100;
+int rectWidth = 600;
+
+int windowWidth = rectWidth + rectMargin*3;
+int windowHeight = rectMargin + (maxNumberOfRows + 1) * (fontSize *2);
+
+int rectHeight = windowHeight - rectMargin;
+int rectCenter = rectMargin + rectWidth / 2;
+int rectLeft = rectMargin;
+int rectRight = rectMargin + rectWidth; 
+
+String [] sensorLabels = { "", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"};
+int [] values   = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int [] rangeMin = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int [] rangeMax = { 0, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024, 1024 };
+
+float lastMsgTime;
+float displayRefreshInterval = 20; // min time between screen draws
+
+short portIndex = 0;  // select the com port, 0 is the first port
+
+void setup() {     
+  size(windowWidth, windowHeight);
+  String portName = Serial.list()[portIndex];
+  println(Serial.list());
+  println(" Connecting to -> " + portName) ;
+  myPort = new Serial(this, portName, 9600);
+  fontA = createFont("Arial.normal", fontSize);  
+  textFont(fontA);
+}
+
+void drawGrid() {  
+  fill(0); 
+  String Title = "Arduino Data (" + Serial.list()[portIndex] + ")" ;
+  int xPos = (int)( rectCenter - textWidth(Title)/2) ; 
+  text(Title, xPos, fontSize*2); // Title
+     
+  line(rectLeft, yPos(0), rectLeft, yPos(maxNumberOfRows) + fontSize);     // left vertical line
+  line( rectRight, yPos(0), rectRight, yPos(maxNumberOfRows) + fontSize);  // right line 
+  line(rectCenter, yPos(0), rectCenter, yPos(maxNumberOfRows) + fontSize); // center line 
+
+  for (int i=1; i <= maxNumberOfRows; i++) {
+    fill(0);
+    text(sensorLabels[i], fontSize, yPos(i));  // row labels
+    fill(150);    
+    String rangeCaption = "(" + rangeMin[i] + "~"  + rangeMax[i] + ")";
+    text(rangeCaption, rectRight + fontSize, yPos(i)); // range caption
+  }
+}
+
+int yPos(int index) {
+  return rectMargin  + ((index-1) * fontSize*2);
+}
+
+/*
+int xPos(int value) {
+ return origin  + int(scale * value);
+ }
+ */
+
+void drawBar(int rowIndex) {
+  fill(204);
+  if ( rangeMin[rowIndex] < 0) {
+    if (values[rowIndex] < 0) {
+      int width = int(map(values[rowIndex], 0, rangeMin[rowIndex], 0, rectWidth/2));        
+      rect(rectCenter-width, yPos(rowIndex)-fontSize, width, fontSize);
+      print("row="); 
+      print (rowIndex); 
+      print(": val="); 
+      print(values[rowIndex]); 
+      print(", w="); 
+      println(width);
+    }
+    else {
+      int width = int(map(values[rowIndex], 0, rangeMax[rowIndex], 0, rectWidth/2));
+      rect(rectCenter, yPos(rowIndex)-fontSize, width, fontSize);
+      print("row="); 
+      print (rowIndex); 
+      print(": val="); 
+      print(values[rowIndex]); 
+      print(", w="); 
+      println(width);
+    }
+  }
+  else {
+    int width = int(map(values[rowIndex], rangeMin[rowIndex], rangeMax[rowIndex], 0, rectWidth));
+    rect(rectLeft, yPos(rowIndex)-fontSize, width, fontSize);   //draw the value
+  }  
+  fill(0);
+  text(values[rowIndex], rectRight + rectMargin, yPos(rowIndex)); // print the value
+}
+
+void processMessages() {
+  while (myPort.available () > 0) {
+    try {
+      message = myPort.readStringUntil(10); 
+      if (message != null) {
+        print(message); 
+        int row = 0;
+        
+        String [] data  = message.split(","); // Split the CSV message     
+        if ( data[0].equals("Label") ) { // check for label header       
+          row =  Integer.parseInt(data[1]); 
+          sensorLabels[row] = data[2];
+          checkRefresh();
+        }                
+        else if ( data[0].equals("Range")) {  // check for Range header    
+          row =  Integer.parseInt(data[1]);
+          rangeMin[row] = Integer.parseInt(data[2]);
+          rangeMax[row] = Integer.parseInt(data[3]);
+          checkRefresh();
+        }       
+        else if ( data[0].equals("Data")) {  // check for data header            
+          row =  Integer.parseInt(data[1]); 
+          values[row] = Integer.parseInt(data[2]);
+          checkRefresh();
+        }
+        
+      }
+    }
+    catch (Exception e) {
+      e.printStackTrace(); // Display whatever error we received
+    }
+  }
+}
+
+void checkRefresh()
+{
+   if( lastMsgTime < 1)
+     lastMsgTime = millis(); // update the time if it was reset by the last display refresh 
+}
+
+void draw() {
+  processMessages();
+  if( millis() - lastMsgTime > displayRefreshInterval) {
+    background(255); 
+    drawGrid();             
+    for ( int i=1; i <= maxNumberOfRows; i++) 
+    {
+      drawBar(i);
+    }
+     lastMsgTime = 0;
+   }
+   else {
+       print("last message time = "); println(millis() - lastMsgTime);
+   }
+}
+
